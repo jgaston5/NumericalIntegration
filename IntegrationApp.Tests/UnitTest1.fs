@@ -16,36 +16,39 @@ type BoundedIntegral = {
 type NumericalIntegrationMethod = 
     BoundedIntegral
         -> double
+        
+type RiemanSumType = 
+    RHS | LHS | MPS | TZS
 
-let rhs (n:int): NumericalIntegrationMethod   =
-    fun (boundedIntegral) -> 
-        let mutable result = 0.0
-        let width = boundedIntegral.b - boundedIntegral.a
-        let delta = width / (double n)
-        let mutable inputValue = delta + boundedIntegral.a
-        while inputValue <= boundedIntegral.b do
-            result <- result + ((boundedIntegral.f inputValue) * delta)
-            inputValue <- inputValue + delta
-        result
+//type RiemanEvaluator = double -> double -> (double -> double) -> double
 
-let lhs (n:int) : NumericalIntegrationMethod   =
+let RightHandSum (left: double, delta: double, f: double -> double): double = 
+    f (left + delta)
+
+let LeftHandSum (left: double, delta: double, f: double -> double) : double = 
+    f left
+
+let MidpointSum (left: double, delta: double, f: double -> double) : double = 
+    f (left + (delta/2.0))
+
+let TrapezoidSum (left: double, delta: double, f: double -> double) : double = 
+    (f (left)  + f (left + delta))/2.0
+
+let RiemanSumGenerator (method: RiemanSumType, n: int): NumericalIntegrationMethod = 
     fun (boundedIntegral) -> 
-        let mutable result = 0.0
         let width = boundedIntegral.b - boundedIntegral.a
         let delta = width / (double n)
         let mutable inputValue = boundedIntegral.a
-        while inputValue < boundedIntegral.b do
-            result <- result + ((boundedIntegral.f inputValue) * delta)
+        let nextValue = match method with
+                        | RHS -> RightHandSum
+                        | LHS -> LeftHandSum      
+                        | MPS -> MidpointSum      
+                        | TZS -> TrapezoidSum      
+        let mutable result = (double)0.0
+        for i in 1 .. n do
+            result <- result + (nextValue(inputValue, delta, boundedIntegral.f) * delta)
             inputValue <- inputValue + delta
         result
-
-type RiemanSumType = 
-    RHS | LHS 
-
-let RiemanSumGenerator (method: RiemanSumType, n: int) = 
-    match method with
-    | RHS -> rhs n
-    | LHS -> lhs n
 
 let evaulate (boundedIntegral: BoundedIntegral, numericalIntegrationMethod: NumericalIntegrationMethod) = 
     if boundedIntegral.a = boundedIntegral.b then 0.0
@@ -57,17 +60,15 @@ let evaulate (boundedIntegral: BoundedIntegral, numericalIntegrationMethod: Nume
 let anyConstantFunction x = 1.0   // y = 1
 let anyIncreasingFunction x = (x * 2.0) + 1.0 // y = 2x + 1
 let anyDecreasingFunction x = -(x * 2.0) + 1.0 // y = -2x + 1
-
 // END move these basic functions to a (test?) helper
 
-
-let anyNumericalMethod = rhs 1
 
 [<TestCase(1)>]
 [<TestCase(2)>]
 [<TestCase(2.23)>]
 [<TestCase(-2.23)>]
 let AnyIntervalOfLength0_Always_Returns0(bounds:double) =
+    let anyNumericalMethod = RiemanSumGenerator(RHS, 1)
     Assert.AreEqual(0, evaulate ({a = bounds; b = bounds; f = anyConstantFunction}, anyNumericalMethod))
     Assert.AreEqual(0, evaulate ({a = bounds; b = bounds; f = anyIncreasingFunction}, anyNumericalMethod))
 
@@ -96,12 +97,12 @@ let RiemanSumOfAConstantFunction_Always_ReturnsTheExactAnswer(n: int, a: double,
 [<TestCase(6, 1, 3)>]
 [<TestCase(8, 2, 3)>]
 let RightHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
-    let rhsMethod = RiemanSumGenerator (RHS,  n)
+    let rs = RiemanSumGenerator (RHS,  n)
     let derivativeFunction = anyIncreasingFunction // 2x + 1 
     let integralFunction x: double = (x ** 2.0) + x // xx + x
     let correctAnswer = integralFunction(b) - integralFunction(a)
-    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rhsMethod)
-    Assert.Less(correctAnswer, estimatedAnswer)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Greater(estimatedAnswer, correctAnswer)
 
 [<TestCase(1, 1, 2)>]
 [<TestCase(2, 1, 3)>]
@@ -112,12 +113,12 @@ let RightHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnOverEstimateAnswer(
 [<TestCase(6, 1, 3)>]
 [<TestCase(8, 2, 3)>]
 let RightHandRiemanSumOfADecreasingFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
-    let rhs = RiemanSumGenerator (RHS,  n)
-    let derivativeFunction = anyDecreasingFunction // 2x - 1 
-    let integralFunction x: double = (x ** 2.0) - x // xx - x
+    let rs = RiemanSumGenerator (RHS,  n)
+    let derivativeFunction = anyDecreasingFunction // -2x + 1 
+    let integralFunction x: double = -(x ** 2.0) + x // -xx + x
     let correctAnswer = integralFunction(b) - integralFunction(a)
-    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rhs)
-    Assert.Greater(correctAnswer, estimatedAnswer)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Less(estimatedAnswer, correctAnswer)
 
 [<TestCase(1, 1, 2)>]
 [<TestCase(2, 1, 3)>]
@@ -128,12 +129,12 @@ let RightHandRiemanSumOfADecreasingFunction_Always_ReturnsAnUnderEstimateAnswer(
 [<TestCase(6, 1, 3)>]
 [<TestCase(8, 2, 3)>]
 let LeftHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
-    let lhsMethod = RiemanSumGenerator (LHS,  n)
+    let rs = RiemanSumGenerator (LHS,  n)
     let derivativeFunction = anyIncreasingFunction // 2x + 1 
     let integralFunction x: double = (x ** 2.0) + x // xx + x
     let correctAnswer = integralFunction(b) - integralFunction(a)
-    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, lhsMethod)
-    Assert.Greater(correctAnswer, estimatedAnswer)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Less(estimatedAnswer, correctAnswer )
 
 
 [<TestCase(1, 1, 2)>]
@@ -145,9 +146,79 @@ let LeftHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnUnderEstimateAnswer(
 [<TestCase(6, 1, 3)>]
 [<TestCase(8, 2, 3)>]
 let LeftHandRiemanSumOfADecreasingFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
-    let lhs = RiemanSumGenerator (LHS,  n)
-    let derivativeFunction = anyDecreasingFunction // 2x - 1 
-    let integralFunction x: double = (x ** 2.0) + x // xx - x
+    let rs = RiemanSumGenerator (LHS,  n)
+    let derivativeFunction = anyDecreasingFunction // -2x + 1 
+    let integralFunction x: double = -(x ** 2.0) + x // -xx + x
     let correctAnswer = integralFunction(b) - integralFunction(a)
-    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, lhs)
-    Assert.Greater(correctAnswer, estimatedAnswer)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Greater(estimatedAnswer, correctAnswer)
+
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let MidpointRiemanSumOfAConcaveUpFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
+    let rs = RiemanSumGenerator (MPS,  n)
+    let anyConcaveUpFunctionOverGivenRange x = (x * x * 3.0) // y = 3xx 
+    let derivativeFunction = anyConcaveUpFunctionOverGivenRange 
+    let integralFunction x: double = (x ** 3.0)// xxx
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Less(estimatedAnswer, correctAnswer)
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let MidpointRiemanSumOfAConcaveDownFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
+    let rs = RiemanSumGenerator (MPS,  n)
+    let anyConcaveDownFunctionOverGivenDomain x = -(x * x * 3.0) // y = -3xx 
+    let derivativeFunction = anyConcaveDownFunctionOverGivenDomain 
+    let integralFunction x: double = -(x ** 3.0)// -xxx
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Greater(estimatedAnswer, correctAnswer)
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let TrapezoidalRiemanSumOfAConcaveUpFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
+    let rs = RiemanSumGenerator (TZS,  n)
+    let anyConcaveUpFunctionOverGivenDomain x = (x * x * 3.0) // y = 3xx 
+    let derivativeFunction = anyConcaveUpFunctionOverGivenDomain 
+    let integralFunction x: double = (x ** 3.0) // xxx
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Greater(estimatedAnswer, correctAnswer )
+
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let TrapezoidalRiemanSumOfAConcaveDownFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
+    let rs = RiemanSumGenerator (TZS,  n)
+    let anyConcaveDownFunctionOverGivenDomain x = -(x * x * 3.0) // y = -3xx 
+    let derivativeFunction = anyConcaveDownFunctionOverGivenDomain
+    let integralFunction x: double = -(x ** 3.0)// -xxx
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rs)
+    Assert.Less(estimatedAnswer, correctAnswer)
