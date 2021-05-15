@@ -55,8 +55,8 @@ let evaulate (boundedIntegral: BoundedIntegral, numericalIntegrationMethod: Nume
 
 // TODO move these basic functions to a (test?) helper
 let anyConstantFunction x = 1.0   // y = 1
-let anyIncreasingLinearFunction x = (x ** 2.0) + 1.0 // y = 2x + 1
-let anyDecreasingLinearFunction x = -(x ** 2.0) + 1.0 // y = -2x + 1
+let anyIncreasingFunction x = (x * 2.0) + 1.0 // y = 2x + 1
+let anyDecreasingFunction x = -(x * 2.0) + 1.0 // y = -2x + 1
 
 // END move these basic functions to a (test?) helper
 
@@ -69,7 +69,7 @@ let anyNumericalMethod = rhs 1
 [<TestCase(-2.23)>]
 let AnyIntervalOfLength0_Always_Returns0(bounds:double) =
     Assert.AreEqual(0, evaulate ({a = bounds; b = bounds; f = anyConstantFunction}, anyNumericalMethod))
-    Assert.AreEqual(0, evaulate ({a = bounds; b = bounds; f = anyIncreasingLinearFunction}, anyNumericalMethod))
+    Assert.AreEqual(0, evaulate ({a = bounds; b = bounds; f = anyIncreasingFunction}, anyNumericalMethod))
 
 [<TestCase(1, 1, 2)>]
 [<TestCase(2, 1, 3)>]
@@ -84,12 +84,70 @@ let RiemanSumOfAConstantFunction_Always_ReturnsTheExactAnswer(n: int, a: double,
     let lhsMethod = RiemanSumGenerator (LHS,  n) 
     let constantValue = 1.0  // this anyConstantFunction has a value of 1
     let correctAnswer = (b - a) * constantValue
-    Assert.AreEqual(correctAnswer, evaulate ({ a= a; b = b; f = anyConstantFunction}, rhsMethod);)
-    Assert.AreEqual(correctAnswer, evaulate ({ a= a; b = b; f = anyConstantFunction}, lhsMethod);)
+    Assert.AreEqual(correctAnswer, evaulate ({ a= a; b = b; f = anyConstantFunction}, rhsMethod))
+    Assert.AreEqual(correctAnswer, evaulate ({ a= a; b = b; f = anyConstantFunction}, lhsMethod))
 
 [<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
 let RightHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
-    let rhsMethod = RiemanSumGenerator (RHS,  n) 
+    let rhsMethod = RiemanSumGenerator (RHS,  n)
+    let derivativeFunction = anyIncreasingFunction // 2x + 1 
+    let integralFunction x: double = (x ** 2.0) + x // xx + x
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rhsMethod)
+    Assert.Less(correctAnswer, estimatedAnswer)
 
-    //Todo this
-    Assert.True(false)
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let RightHandRiemanSumOfADecreasingFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
+    let rhs = RiemanSumGenerator (RHS,  n)
+    let derivativeFunction = anyDecreasingFunction // 2x - 1 
+    let integralFunction x: double = (x ** 2.0) - x // xx - x
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, rhs)
+    Assert.Greater(correctAnswer, estimatedAnswer)
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let LeftHandRiemanSumOfAnIncreasingFunction_Always_ReturnsAnUnderEstimateAnswer(n: int, a: double, b: double) = 
+    let lhsMethod = RiemanSumGenerator (LHS,  n)
+    let derivativeFunction = anyIncreasingFunction // 2x + 1 
+    let integralFunction x: double = (x ** 2.0) + x // xx + x
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, lhsMethod)
+    Assert.Greater(correctAnswer, estimatedAnswer)
+
+
+[<TestCase(1, 1, 2)>]
+[<TestCase(2, 1, 3)>]
+[<TestCase(3, 1, 4)>]
+[<TestCase(4, 2, 5)>]
+[<TestCase(5, 10, 20)>]
+[<TestCase(6, 0, 3)>]
+[<TestCase(6, 1, 3)>]
+[<TestCase(8, 2, 3)>]
+let LeftHandRiemanSumOfADecreasingFunction_Always_ReturnsAnOverEstimateAnswer(n: int, a: double, b: double) = 
+    let lhs = RiemanSumGenerator (LHS,  n)
+    let derivativeFunction = anyDecreasingFunction // 2x - 1 
+    let integralFunction x: double = (x ** 2.0) + x // xx - x
+    let correctAnswer = integralFunction(b) - integralFunction(a)
+    let estimatedAnswer = evaulate ({ a= a; b = b; f = derivativeFunction}, lhs)
+    Assert.Greater(correctAnswer, estimatedAnswer)
