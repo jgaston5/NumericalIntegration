@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\IntegrationApp\IntegrationApp.fsproj" />
+    <ProjectReference Include="..\NumericalIntegration\NumericalIntegration.fsproj" />
   </ItemGroup>
 
 </Project>

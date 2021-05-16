@@ -1,4 +1,4 @@
-module IntegrationApp.RiemanSumTests
+module NumericalIntegration.RiemanSumTests
 
 open NUnit.Framework
 open BaseTypes

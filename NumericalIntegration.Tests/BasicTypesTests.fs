@@ -1,4 +1,4 @@
-module IntegrationApp.BasicTypesTests
+module NumericalIntegration.BasicTypesTests
 
 open NUnit.Framework
 open BaseTypes
